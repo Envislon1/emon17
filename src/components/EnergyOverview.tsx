@@ -43,11 +43,8 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
       // Calculate cost: (Channel Energy / Total Device Energy) * Total Bill
       const channelCost = totalDeviceEnergy > 0 ? (channelEnergy / totalDeviceEnergy) * totalBillAmount : 0;
       
-      // Calculate global color index - same logic as CurrentValuesPieChart
-      const deviceIndex = deviceAssignments.findIndex(d => d.device_id === selectedDeviceId);
-      const deviceChannelsList = deviceChannels.filter(ch => ch.device_id === selectedDeviceId);
-      const channelIndex = deviceChannelsList.findIndex(ch => ch.channel_number === channelNumber);
-      const globalColorIndex = (deviceIndex * deviceChannelsList.length + channelIndex) % GRADIENT_COLORS.length;
+      // Fixed color indexing - use channel index directly for consistent colors
+      const colorIndex = i % GRADIENT_COLORS.length;
       
       // Determine if this channel is online based on recent readings
       const isChannelOnline = channelReadings.length > 0 && channelReadings.some(reading => 
@@ -67,8 +64,8 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
         value: Number((channelEnergy / 1000).toFixed(2)), // Convert Wh to kWh for bar chart
         current: Number(currentValue.toFixed(2)), // Current for reference
         cost: Number(channelCost.toFixed(2)),
-        color: GRADIENT_COLORS[globalColorIndex],
-        gradientId: `gradient${selectedDeviceId}-${channelNumber}`,
+        color: GRADIENT_COLORS[colorIndex],
+        gradientId: `gradient-${channelNumber}`,
         isOnline,
         deviceId: selectedDeviceId,
         channelNumber: channelNumber

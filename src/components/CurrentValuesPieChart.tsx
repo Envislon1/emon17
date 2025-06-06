@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useEnergy } from '@/contexts/EnergyContext';
@@ -10,15 +11,24 @@ const GRADIENT_COLORS = [
 ];
 
 const CurrentValuesPieChart = () => {
-  const { deviceAssignments, deviceChannels, energyReadings } = useEnergy();
+  const { deviceAssignments, deviceChannels, energyReadings, selectedDeviceId } = useEnergy();
 
-  const chartData = deviceAssignments.map((device, deviceIndex) => {
-    const deviceChannelsList = deviceChannels.filter(ch => ch.device_id === device.device_id);
-    
-    return deviceChannelsList.map((channel, channelIndex) => {
+  // Filter for selected device only
+  const selectedDevice = deviceAssignments.find(d => d.device_id === selectedDeviceId);
+  const selectedDeviceChannels = deviceChannels.filter(ch => ch.device_id === selectedDeviceId);
+  const selectedDeviceReadings = energyReadings.filter(r => r.device_id === selectedDeviceId);
+
+  const chartData = selectedDevice ? (() => {
+    return Array.from({ length: selectedDevice.channel_count }, (_, i) => {
+      const channelNumber = i + 1;
+      const channel = selectedDeviceChannels.find(ch => ch.channel_number === channelNumber) || {
+        custom_name: `House${channelNumber}`,
+        channel_number: channelNumber
+      };
+
       // Get the latest reading for this channel
-      const channelReadings = energyReadings
-        .filter(r => r.device_id === device.device_id && r.channel_number === channel.channel_number)
+      const channelReadings = selectedDeviceReadings
+        .filter(r => r.channel_number === channelNumber)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       
       const latestReading = channelReadings[0];
@@ -28,21 +38,22 @@ const CurrentValuesPieChart = () => {
       const isOnline = latestReading ? 
         (Date.now() - new Date(latestReading.timestamp).getTime()) < 60000 : false;
       
-      const colorIndex = (deviceIndex * deviceChannelsList.length + channelIndex) % GRADIENT_COLORS.length;
+      // Use consistent color indexing - channel index directly
+      const colorIndex = i % GRADIENT_COLORS.length;
       
       return {
-        name: channel.custom_name || `House${channel.channel_number}`,
+        name: channel.custom_name || `House${channelNumber}`,
         value: Number(currentValue.toFixed(2)),
         color: GRADIENT_COLORS[colorIndex],
         isOnline,
-        deviceId: device.device_id,
-        channelNumber: channel.channel_number
+        deviceId: selectedDeviceId,
+        channelNumber: channelNumber
       };
     });
-  }).flat();
+  })() : [];
 
-  // Only show channels with values > 0 and online
-  const filteredData = chartData.filter(item => item.value > 0 && item.isOnline);
+  // Show channels with values > 0 OR online status (to show real-time activity)
+  const filteredData = chartData.filter(item => (item.value > 0 || item.isOnline) && item.isOnline);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -81,12 +92,36 @@ const CurrentValuesPieChart = () => {
     );
   };
 
+  if (!selectedDevice) {
+    return (
+      <Card className="energy-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-energy-600 dark:text-energy-400" />
+            Real-time Current Values
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="w-full h-80 flex items-center justify-center">
+            <div className="text-center">
+              <Zap className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No device selected</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Please add a device to see real-time current values
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="energy-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-energy-600 dark:text-energy-400" />
-          Real-time Current Values
+          Real-time Current Values - {selectedDevice.custom_name || selectedDevice.device_name}
         </CardTitle>
       </CardHeader>
       <CardContent>
