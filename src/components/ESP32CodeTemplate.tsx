@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,11 +26,11 @@ const ESP32CodeTemplate: React.FC<ESP32CodeTemplateProps> = ({
 #define EEPROM_SIZE 512
 #define ENERGY_START_ADDR 0
 #define VOLTAGE 220.0
-#define COST_PER_KWH 3.0
 #define EEPROM_WRITE_INTERVAL 5 * 60 * 1000UL  // 5 minutes
 
 // Supabase configuration
 const char* supabase_url = "https://lkbetmgdvhklzdfywiwq.supabase.co";
+const char* function_url = "https://lkbetmgdvhklzdfywiwq.supabase.co/functions/v1/esp32-energy-upload";
 const char* supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxrYmV0bWdkdmhrbHpkZnl3aXdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMDEwNzgsImV4cCI6MjA2NDU3NzA3OH0.JNTbRMEff0G4eqSSYzjosaQ2-P87lBm0ceSmVENxBvU";
 
 // Global runtime values
@@ -120,7 +119,8 @@ void loop() {
     float power = VOLTAGE * current[i]; // Power in Watts
     energyWh[i] += power / 3600.0; // Energy in Wh (power per second)
     
-    uploadChannelData(i + 1, current[i], power, energyWh[i]); // Channel numbers start from 1
+    // Send real-time data (cost calculated on server)
+    uploadChannelData(i + 1, current[i], power, energyWh[i]); 
     delay(100); // Small delay between uploads
   }
 
@@ -152,24 +152,19 @@ float readCurrent(int channel) {
 
 void uploadChannelData(int channelNumber, float current, float power, float energyWh) {
   HTTPClient http;
-  String url = String(supabase_url) + "/rest/v1/energy_data";
   
-  http.begin(url);
+  http.begin(function_url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("apikey", supabase_key);
   http.addHeader("Authorization", String("Bearer ") + supabase_key);
 
-  // Calculate cost based on energy consumption
-  float cost = (energyWh / 1000.0) * COST_PER_KWH; // Convert Wh to kWh for cost calculation
-
-  // Create JSON payload matching your database schema
-  DynamicJsonDocument doc(512);
+  // Create JSON payload (no cost calculation - done on server)
+  DynamicJsonDocument doc(256);
   doc["device_id"] = device_id;
   doc["channel_number"] = channelNumber;
   doc["current"] = round(current * 100) / 100.0; // Round to 2 decimal places
   doc["power"] = round(power * 100) / 100.0;
   doc["energy_wh"] = round(energyWh * 100) / 100.0;
-  doc["cost"] = round(cost * 100) / 100.0;
 
   String requestBody;
   serializeJson(doc, requestBody);
@@ -177,7 +172,7 @@ void uploadChannelData(int channelNumber, float current, float power, float ener
   int httpCode = http.POST(requestBody);
   Serial.printf("Upload CH%d -> HTTP %d\\n", channelNumber, httpCode);
   
-  if (httpCode == 201) {
+  if (httpCode == 200) {
     // Success - brief LED flash
     digitalWrite(LED_PIN, HIGH);
     delay(50);
@@ -287,7 +282,7 @@ void blinkError() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Code className="w-5 h-5 text-orange-600" />
-            ESP32 {channelCount}-Channel Energy Monitor Code (Dashboard Compatible)
+            ESP32 {channelCount}-Channel Energy Monitor (Real-time Only)
           </CardTitle>
           <Button
             variant="outline"
@@ -307,41 +302,38 @@ void blinkError() {
         
         <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
           <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
-            ✅ Fixed Issues from Your Original Code:
+            ✅ Real-time Only Configuration:
           </p>
           <ul className="text-xs text-green-700 dark:text-green-300 space-y-1 list-disc list-inside">
-            <li>Removed dependency on non-existent `sensors` table</li>
-            <li>Added proper `channel_number` field to match dashboard schema</li>
-            <li>Uses `device_assignments` table to check if device is registered</li>
-            <li>Direct upload to `energy_data` table with correct field names</li>
-            <li>Improved error handling and LED status indicators</li>
-            <li>Better EEPROM validation to prevent data corruption</li>
+            <li>No permanent data storage - saves database space</li>
+            <li>Cost calculation happens on server using total bill amount</li>
+            <li>Real-time broadcasts for immediate dashboard updates</li>
+            <li>Energy tracking persisted locally on ESP32 EEPROM</li>
+            <li>Proportional cost distribution based on energy consumption</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-            🔧 How to Use This Updated Code:
+            🔧 How Real-time Mode Works:
           </p>
           <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
-            <li>First, add your device in the dashboard using Device ID: {deviceId}</li>
-            <li>Flash this code to your ESP32 with {channelCount} channels configured</li>
-            <li>The device will automatically check if it's registered before starting data upload</li>
-            <li>Data will appear in your dashboard automatically once uploaded</li>
-            <li>LED patterns: 3 quick blinks = success, fast blinking = error</li>
+            <li>ESP32 sends current, power, and cumulative energy readings</li>
+            <li>Server calculates proportional costs based on total bill setting</li>
+            <li>Data broadcasted in real-time to connected dashboard clients</li>
+            <li>No database storage - perfect for 500MB limit management</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
           <p className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
-            📋 Hardware Requirements for {channelCount} Channels:
+            📋 Hardware Requirements remain the same:
           </p>
           <ul className="text-xs text-orange-700 dark:text-orange-300 space-y-1 list-disc list-inside">
             <li>ESP32 development board</li>
             <li>{Math.ceil(channelCount / 4)}x ADS1115 16-bit ADC modules</li>
             <li>{channelCount}x ACS712-30A current sensors</li>
-            <li>I2C addresses: 0x48, 0x49, 0x4A, 0x4B (as needed)</li>
-            <li>Proper power supply and connections</li>
+            <li>Energy tracking handled locally on device EEPROM</li>
           </ul>
         </div>
       </CardContent>

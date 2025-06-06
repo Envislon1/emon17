@@ -32,6 +32,16 @@ interface EnergyReading {
   timestamp: string;
 }
 
+interface RealtimeEnergyData {
+  device_id: string;
+  channel_number: number;
+  current: number;
+  power: number;
+  energy_wh: number;
+  cost: number;
+  timestamp: string;
+}
+
 interface TotalBillSetting {
   id: string;
   device_id: string;
@@ -52,6 +62,7 @@ interface EnergyContextType {
   deviceAssignments: DeviceAssignment[];
   deviceChannels: DeviceChannel[];
   energyReadings: EnergyReading[];
+  realtimeData: Map<string, RealtimeEnergyData>;
   totalBillSettings: TotalBillSetting[];
   selectedDeviceId: string | null;
   isLoading: boolean;
@@ -82,6 +93,7 @@ export const EnergyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [deviceAssignments, setDeviceAssignments] = useState<DeviceAssignment[]>([]);
   const [deviceChannels, setDeviceChannels] = useState<DeviceChannel[]>([]);
   const [energyReadings, setEnergyReadings] = useState<EnergyReading[]>([]);
+  const [realtimeData, setRealtimeData] = useState<Map<string, RealtimeEnergyData>>(new Map());
   const [totalBillSettings, setTotalBillSettings] = useState<TotalBillSetting[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -111,15 +123,8 @@ export const EnergyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .select('*')
         .eq('user_id', user.id);
 
-      // Fetch energy data for user's devices
-      const userDeviceIds = deviceAssignmentsData?.map(d => d.device_id) || [];
-      const { data: energyData } = await supabase
-        .from('energy_data')
-        .select('*')
-        .in('device_id', userDeviceIds)
-        .order('timestamp', { ascending: false });
-
       // Fetch total bill settings for user's devices
+      const userDeviceIds = deviceAssignmentsData?.map(d => d.device_id) || [];
       const { data: totalBillData } = await supabase
         .from('total_bill_settings')
         .select('*')
@@ -127,8 +132,21 @@ export const EnergyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       setDeviceAssignments(deviceAssignmentsData || []);
       setDeviceChannels(deviceChannelsData || []);
-      setEnergyReadings(energyData || []);
       setTotalBillSettings(totalBillData || []);
+
+      // Convert realtime data to energyReadings format for compatibility
+      const realtimeReadings: EnergyReading[] = Array.from(realtimeData.values()).map(data => ({
+        id: `${data.device_id}_${data.channel_number}_${data.timestamp}`,
+        device_id: data.device_id,
+        channel_number: data.channel_number,
+        current: data.current,
+        power: data.power,
+        energy_wh: data.energy_wh,
+        cost: data.cost,
+        timestamp: data.timestamp
+      }));
+      setEnergyReadings(realtimeReadings);
+
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -141,25 +159,8 @@ export const EnergyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const refreshEnergyData = async () => {
-    if (!user || deviceAssignments.length === 0) return;
-
-    try {
-      // Only fetch energy data for more efficient real-time updates
-      const userDeviceIds = deviceAssignments.map(d => d.device_id);
-
-      console.log('Refreshing energy data for devices:', userDeviceIds);
-
-      const { data: energyData } = await supabase
-        .from('energy_data')
-        .select('*')
-        .in('device_id', userDeviceIds)
-        .order('timestamp', { ascending: false });
-
-      console.log('Fetched energy data:', energyData?.length, 'records');
-      setEnergyReadings(energyData || []);
-    } catch (error) {
-      console.error('Error fetching energy data:', error);
-    }
+    // Real-time data is handled by subscriptions, no need to fetch
+    console.log('Real-time data refresh - handled by subscriptions');
   };
 
   const assignDevice = async (deviceId: string, deviceName: string, channelCount: number) => {
@@ -402,39 +403,54 @@ export const EnergyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (!user || deviceAssignments.length === 0) return;
 
-    console.log('Setting up real-time subscription and refresh interval');
+    console.log('Setting up real-time subscriptions for energy data');
 
-    // Set up real-time subscription for energy data
-    const subscription = supabase
-      .channel('energy_data_changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'energy_data'
-      }, (payload) => {
-        console.log('Real-time energy data change detected:', payload);
-        refreshEnergyData();
-      })
-      .subscribe();
-
-    // Set up 1-minute interval for energy data refresh
-    const refreshInterval = setInterval(() => {
-      console.log('Scheduled refresh of energy data');
-      refreshEnergyData();
-    }, 60000); // Refresh every 1 minute
+    // Subscribe to real-time broadcasts for each device
+    const subscriptions = deviceAssignments.map(device => {
+      return supabase
+        .channel(`device_${device.device_id}`)
+        .on('broadcast', { event: 'energy_update' }, (payload) => {
+          console.log('Real-time energy update received:', payload);
+          const data = payload.payload as RealtimeEnergyData;
+          
+          setRealtimeData(prev => {
+            const key = `${data.device_id}_${data.channel_number}`;
+            const newMap = new Map(prev);
+            newMap.set(key, data);
+            
+            // Convert to energyReadings format for backward compatibility
+            const realtimeReadings: EnergyReading[] = Array.from(newMap.values()).map(item => ({
+              id: `${item.device_id}_${item.channel_number}_${item.timestamp}`,
+              device_id: item.device_id,
+              channel_number: item.channel_number,
+              current: item.current,
+              power: item.power,
+              energy_wh: item.energy_wh,
+              cost: item.cost,
+              timestamp: item.timestamp
+            }));
+            setEnergyReadings(realtimeReadings);
+            
+            return newMap;
+          });
+        })
+        .subscribe();
+    });
 
     return () => {
-      console.log('Cleaning up subscriptions and intervals');
-      subscription.unsubscribe();
-      clearInterval(refreshInterval);
+      console.log('Cleaning up real-time subscriptions');
+      subscriptions.forEach(subscription => {
+        subscription.unsubscribe();
+      });
     };
-  }, [user, deviceAssignments.length]); // Only depend on the length, not the full array
+  }, [user, deviceAssignments.length]);
 
   return (
     <EnergyContext.Provider value={{
       deviceAssignments,
       deviceChannels,
       energyReadings,
+      realtimeData,
       totalBillSettings,
       selectedDeviceId,
       isLoading,

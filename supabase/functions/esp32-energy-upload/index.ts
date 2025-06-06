@@ -31,7 +31,7 @@ serve(async (req) => {
 
     const requestData = await req.json()
     
-    const { device_id, channel_number, current, power, energy_wh, cost } = requestData
+    const { device_id, channel_number, current, power, energy_wh } = requestData
 
     if (!device_id || channel_number === undefined) {
       return new Response(
@@ -43,8 +43,7 @@ serve(async (req) => {
       )
     }
 
-    // Check if device exists in device_assignments table - use limit(1) instead of single()
-    // since multiple users can have access to the same device
+    // Check if device exists in device_assignments table
     const { data: deviceAssignments, error: deviceError } = await supabaseClient
       .from('device_assignments')
       .select('device_id, channel_count')
@@ -75,36 +74,66 @@ serve(async (req) => {
       )
     }
 
-    // Insert energy data - ensure channel_number is always set
-    const { data, error } = await supabaseClient
-      .from('energy_data')
-      .insert({
-        device_id,
-        channel_number: parseInt(channel_number),
-        current: parseFloat(current) || 0,
-        power: parseFloat(power) || 0,
-        energy_wh: parseFloat(energy_wh) || 0,
-        cost: parseFloat(cost) || 0
-      })
-      .select()
+    // Get total bill for cost calculation
+    const { data: totalBillData } = await supabaseClient
+      .from('total_bill_settings')
+      .select('total_bill_amount')
+      .eq('device_id', device_id)
+      .single()
 
-    if (error) {
-      console.error('Insert error:', error)
-      return new Response(
-        JSON.stringify({ error: 'Failed to insert data', details: error.message }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
+    const totalBill = totalBillData?.total_bill_amount || 0
+
+    // Get all energy readings for this device to calculate proportional cost
+    const { data: allChannelData } = await supabaseClient
+      .from('energy_data')
+      .select('channel_number, energy_wh')
+      .eq('device_id', device_id)
+      .order('timestamp', { ascending: false })
+      .limit(deviceAssignment.channel_count)
+
+    // Calculate total device energy consumption
+    const deviceEnergyMap = new Map()
+    allChannelData?.forEach(reading => {
+      if (!deviceEnergyMap.has(reading.channel_number)) {
+        deviceEnergyMap.set(reading.channel_number, reading.energy_wh || 0)
+      }
+    })
+
+    const totalDeviceEnergy = Array.from(deviceEnergyMap.values()).reduce((sum, energy) => sum + energy, 0)
+    
+    // Calculate proportional cost for this channel
+    const channelEnergy = parseFloat(energy_wh) || 0
+    const proportionalCost = totalDeviceEnergy > 0 ? (channelEnergy / totalDeviceEnergy) * totalBill : 0
+
+    // Broadcast real-time data instead of storing permanently
+    const realtimeData = {
+      device_id,
+      channel_number: parseInt(channel_number),
+      current: parseFloat(current) || 0,
+      power: parseFloat(power) || 0,
+      energy_wh: channelEnergy,
+      cost: proportionalCost,
+      timestamp: new Date().toISOString()
     }
 
-    console.log('Successfully inserted energy data for device:', device_id, 'channel:', channel_number)
+    // Send real-time update via Supabase channels
+    await supabaseClient.channel(`device_${device_id}`)
+      .send({
+        type: 'broadcast',
+        event: 'energy_update',
+        payload: realtimeData
+      })
+
+    console.log('Real-time energy data broadcasted for device:', device_id, 'channel:', channel_number)
     
     return new Response(
-      JSON.stringify({ success: true, data }),
+      JSON.stringify({ 
+        success: true, 
+        message: 'Real-time data broadcasted',
+        calculated_cost: proportionalCost
+      }),
       {
-        status: 201,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
@@ -114,7 +143,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ error: 'Internal server error', details: error.message }),
       {
-      status: 500,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
