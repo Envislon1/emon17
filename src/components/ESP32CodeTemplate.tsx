@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ const ESP32CodeTemplate: React.FC<ESP32CodeTemplateProps> = ({
 #define ENERGY_START_ADDR 0
 #define VOLTAGE 220.0
 #define EEPROM_WRITE_INTERVAL 5 * 60 * 1000UL  // 5 minutes
+#define RESET_CHECK_INTERVAL 30 * 1000UL       // 30 seconds
 
 // Supabase configuration
 const char* supabase_url = "https://lkbetmgdvhklzdfywiwq.supabase.co";
@@ -38,6 +40,7 @@ int channelCount = ${channelCount};
 Adafruit_ADS1115 ads[4]; // Support up to 4 ADS modules (16 channels)
 float energyWh[MAX_CHANNELS] = {0};
 unsigned long lastEEPROMWrite = 0;
+unsigned long lastResetCheck = 0;
 bool device_registered = false;
 
 // WiFiManager custom parameters
@@ -108,6 +111,12 @@ void loop() {
     return;
   }
 
+  // Check for reset commands periodically
+  if (millis() - lastResetCheck > RESET_CHECK_INTERVAL) {
+    checkForResetCommand();
+    lastResetCheck = millis();
+  }
+
   // Read current from all channels
   float current[MAX_CHANNELS];
   for (int i = 0; i < channelCount; i++) {
@@ -118,6 +127,9 @@ void loop() {
   for (int i = 0; i < channelCount; i++) {
     float power = VOLTAGE * current[i]; // Power in Watts
     energyWh[i] += power / 3600.0; // Energy in Wh (power per second)
+    
+    Serial.printf("[CH%d] Current: %.2f A, Power: %.2f W, Energy: %.2f Wh\\n", 
+      i + 1, current[i], power, energyWh[i]);
     
     // Send real-time data (cost calculated on server)
     uploadChannelData(i + 1, current[i], power, energyWh[i]); 
@@ -183,6 +195,62 @@ void uploadChannelData(int channelNumber, float current, float power, float ener
     Serial.printf("HTTP error: %d\\n", httpCode);
   }
   
+  http.end();
+}
+
+void checkForResetCommand() {
+  HTTPClient http;
+  String url = String(supabase_url) + "/functions/v1/energy-reset-command/check-reset?device_id=" + device_id;
+
+  http.begin(url);
+  http.addHeader("apikey", supabase_key);
+  http.addHeader("Authorization", String("Bearer ") + supabase_key);
+
+  int httpCode = http.GET();
+  
+  if (httpCode == 200) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(512);
+    
+    if (!deserializeJson(doc, payload)) {
+      bool resetCommand = doc["reset_command"];
+      
+      if (resetCommand) {
+        Serial.println("🔄 ENERGY RESET COMMAND RECEIVED!");
+        
+        // Reset all energy counters
+        for (int i = 0; i < MAX_CHANNELS; i++) {
+          energyWh[i] = 0.0;
+        }
+        
+        // Clear EEPROM
+        for (int i = 0; i < EEPROM_SIZE; i++) {
+          EEPROM.write(i, 0);
+        }
+        EEPROM.commit();
+        
+        Serial.println("✅ Energy counters have been reset!");
+        Serial.println("✅ EEPROM memory cleared!");
+        
+        // Blink LED to indicate successful reset
+        for (int i = 0; i < 5; i++) {
+          digitalWrite(LED_PIN, HIGH);
+          delay(200);
+          digitalWrite(LED_PIN, LOW);
+          delay(200);
+        }
+        
+        // Send confirmation message if available
+        String message = doc["message"];
+        if (message.length() > 0) {
+          Serial.println("Dashboard message: " + message);
+        }
+      }
+    }
+  } else if (httpCode != 404) {
+    Serial.printf("Reset check failed: HTTP %d\\n", httpCode);
+  }
+
   http.end();
 }
 
@@ -269,7 +337,7 @@ void blinkError() {
     try {
       await navigator.clipboard.writeText(esp32Code);
       setCopied(true);
-      toast.success('Updated ESP32 code copied to clipboard!');
+      toast.success('Fixed ESP32 code copied to clipboard!');
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       toast.error('Failed to copy code');
@@ -282,7 +350,7 @@ void blinkError() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Code className="w-5 h-5 text-orange-600" />
-            ESP32 {channelCount}-Channel Energy Monitor (Real-time Only)
+            ESP32 {channelCount}-Channel Energy Monitor (Fixed for Real-time Dashboard)
           </CardTitle>
           <Button
             variant="outline"
@@ -302,38 +370,40 @@ void blinkError() {
         
         <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
           <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
-            ✅ Real-time Only Configuration:
+            ✅ Fixed Issues:
           </p>
           <ul className="text-xs text-green-700 dark:text-green-300 space-y-1 list-disc list-inside">
-            <li>No permanent data storage - saves database space</li>
-            <li>Cost calculation happens on server using total bill amount</li>
-            <li>Real-time broadcasts for immediate dashboard updates</li>
-            <li>Energy tracking persisted locally on ESP32 EEPROM</li>
-            <li>Proportional cost distribution based on energy consumption</li>
+            <li>Removed local cost calculation - server now handles this</li>
+            <li>Updated to use correct esp32-energy-upload endpoint</li>
+            <li>Fixed HTTP response code expectation (200 instead of 201)</li>
+            <li>Updated device registration to use direct Supabase REST API</li>
+            <li>Sends only current, power, and energy_wh to server for real-time display</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-            🔧 How Real-time Mode Works:
+            🔧 How it works with the dashboard:
           </p>
           <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
-            <li>ESP32 sends current, power, and cumulative energy readings</li>
-            <li>Server calculates proportional costs based on total bill setting</li>
-            <li>Data broadcasted in real-time to connected dashboard clients</li>
-            <li>No database storage - perfect for 500MB limit management</li>
+            <li>ESP32 sends raw sensor data (current, power, cumulative energy)</li>
+            <li>Server calculates proportional costs based on your total bill setting</li>
+            <li>Data is broadcasted in real-time to all connected dashboard clients</li>
+            <li>No database storage - saves your 500MB Supabase limit</li>
+            <li>Energy tracking persisted locally on ESP32 EEPROM for accuracy</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
           <p className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
-            📋 Hardware Requirements remain the same:
+            📋 Key Changes Made:
           </p>
           <ul className="text-xs text-orange-700 dark:text-orange-300 space-y-1 list-disc list-inside">
-            <li>ESP32 development board</li>
-            <li>{Math.ceil(channelCount / 4)}x ADS1115 16-bit ADC modules</li>
-            <li>{channelCount}x ACS712-30A current sensors</li>
-            <li>Energy tracking handled locally on device EEPROM</li>
+            <li>Removed COST_PER_KWH constant and local cost calculation</li>
+            <li>Updated upload endpoint to use esp32-energy-upload function</li>
+            <li>Changed success HTTP code check from 201 to 200</li>
+            <li>Fixed device registration to query device_assignments table directly</li>
+            <li>Removed cost field from JSON payload sent to server</li>
           </ul>
         </div>
       </CardContent>
