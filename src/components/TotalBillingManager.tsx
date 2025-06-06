@@ -42,12 +42,24 @@ const TotalBillingManager = () => {
   const calculateProportionalBilling = () => {
     if (!selectedDeviceId) return [];
 
-    const deviceChannelsList = deviceChannels.filter(ch => ch.device_id === selectedDeviceId);
+    const selectedDevice = deviceAssignments.find(d => d.device_id === selectedDeviceId);
+    if (!selectedDevice) return [];
+
     const totalConsumption = calculateTotalConsumption(selectedDeviceId);
     
-    return deviceChannelsList.map(channel => {
+    // Generate channels based on device channel count (similar to pie chart logic)
+    return Array.from({ length: selectedDevice.channel_count }, (_, i) => {
+      const channelNumber = i + 1;
+      
+      // Get custom name from deviceChannels if available, otherwise use default
+      const customChannel = deviceChannels.find(ch => 
+        ch.device_id === selectedDeviceId && ch.channel_number === channelNumber
+      );
+      const customName = customChannel?.custom_name || `House${channelNumber}`;
+      
+      // Get latest reading for this channel
       const channelReadings = energyReadings.filter(reading => 
-        reading.device_id === selectedDeviceId && reading.channel_number === channel.channel_number
+        reading.device_id === selectedDeviceId && reading.channel_number === channelNumber
       );
       
       const channelConsumption = channelReadings.reduce(
@@ -58,7 +70,12 @@ const TotalBillingManager = () => {
       const proportionalAmount = totalConsumption > 0 ? (channelConsumption / totalConsumption) * savedTotalBill : 0;
       
       return {
-        channel,
+        channel: {
+          id: `${selectedDeviceId}_${channelNumber}`,
+          custom_name: customName,
+          channel_number: channelNumber,
+          device_id: selectedDeviceId
+        },
         consumption: channelConsumption / 1000, // Convert to kWh
         percentage: percentage,
         proportionalAmount: proportionalAmount
@@ -222,7 +239,7 @@ const TotalBillingManager = () => {
 
               {proportionalData.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <p>No channels found for this device</p>
+                  <p>No channels available for this device</p>
                   <p className="text-sm mt-2">Energy consumption data will appear once channels start reporting</p>
                 </div>
               ) : (
@@ -253,7 +270,7 @@ const TotalBillingManager = () => {
                       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                         <div 
                           className="bg-orange-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${data.percentage}%` }}
+                          style={{ width: `${Math.max(data.percentage, 1)}%` }}
                         />
                       </div>
                     </div>
