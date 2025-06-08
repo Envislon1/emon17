@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useEnergy } from '@/contexts/EnergyContext';
@@ -5,14 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Zap } from 'lucide-react';
 
 const GRADIENT_COLORS = [
-  { start: '#f97316', end: '#ea580c' }, // Orange gradient - House1
-  { start: '#3b82f6', end: '#1d4ed8' }, // Blue gradient - House2
-  { start: '#10b981', end: '#059669' }, // Green gradient - House3
-  { start: '#8b5cf6', end: '#7c3aed' }, // Purple gradient - House4
-  { start: '#f59e0b', end: '#d97706' }, // Amber gradient - House5
-  { start: '#ef4444', end: '#dc2626' }, // Red gradient - House6
-  { start: '#06b6d4', end: '#0891b2' }, // Cyan gradient - House7
-  { start: '#84cc16', end: '#65a30d' }, // Lime gradient - House8
+  '#f97316', '#3b82f6', '#10b981', '#8b5cf6', 
+  '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'
 ];
 
 const CurrentValuesPieChart = () => {
@@ -39,9 +34,9 @@ const CurrentValuesPieChart = () => {
       const latestReading = channelReadings[0];
       const currentValue = latestReading?.current || 0;
       
-      // Improved online detection - check if device is online (received data in last 20 seconds)
+      // Improved online detection - check if device is online (received data in last 5 seconds)
       const isOnline = latestReading ? 
-        (Date.now() - new Date(latestReading.timestamp).getTime()) < 20000 : false; // 20 seconds
+        (Date.now() - new Date(latestReading.timestamp).getTime()) < 5000 : false; // 5 seconds
       
       // Use channel number - 1 for consistent color indexing (House1 = index 0, House2 = index 1, etc.)
       const colorIndex = (channelNumber - 1) % GRADIENT_COLORS.length;
@@ -49,8 +44,7 @@ const CurrentValuesPieChart = () => {
       return {
         name: channel.custom_name || `House${channelNumber}`,
         value: Number(currentValue.toFixed(2)),
-        color: GRADIENT_COLORS[colorIndex].start,
-        endColor: GRADIENT_COLORS[colorIndex].end,
+        color: GRADIENT_COLORS[colorIndex],
         gradientId: `gradient-${channelNumber}`,
         isOnline,
         deviceId: selectedDeviceId,
@@ -88,25 +82,18 @@ const CurrentValuesPieChart = () => {
 
   const CustomLegend = ({ payload }: any) => {
     return (
-      <div className="flex flex-wrap justify-center gap-3 mt-4">
+      <div className="flex flex-wrap justify-center gap-2 mt-2">
         {payload?.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 hover:bg-muted transition-colors shadow-sm text-xs">
-            <div className="flex items-center gap-1">
-              <div 
-                className="w-3 h-3 rounded-full shadow-sm border border-white/20" 
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="font-medium text-foreground">{entry.value}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                filteredData.find(item => item.name === entry.value)?.isOnline ? 
-                'bg-green-500 animate-pulse' : 'bg-red-500'
-              }`} />
-              <span className="text-muted-foreground">
-                {filteredData.find(item => item.name === entry.value)?.isOnline ? 'Live' : 'Offline'}
-              </span>
-            </div>
+          <div key={index} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-muted/30 text-xs">
+            <div 
+              className="w-2 h-2 rounded-full" 
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="font-medium text-foreground text-xs">{entry.value}</span>
+            <div className={`w-1 h-1 rounded-full ${
+              filteredData.find(item => item.name === entry.value)?.isOnline ? 
+              'bg-green-500' : 'bg-red-500'
+            }`} />
           </div>
         ))}
       </div>
@@ -115,7 +102,7 @@ const CurrentValuesPieChart = () => {
 
   if (!selectedDevice) {
     return (
-      <Card className="energy-card overflow-hidden">
+      <Card className="energy-card overflow-hidden h-[500px]">
         <CardHeader className="bg-gradient-to-r from-energy-50 to-energy-100 dark:from-energy-900/20 dark:to-energy-800/20">
           <CardTitle className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-energy-600 dark:text-energy-400" />
@@ -143,7 +130,7 @@ const CurrentValuesPieChart = () => {
   }
 
   return (
-    <Card className="energy-card overflow-hidden">
+    <Card className="energy-card overflow-hidden h-[500px]">
       <CardHeader className="bg-gradient-to-r from-energy-50 to-energy-100 dark:from-energy-900/20 dark:to-energy-800/20">
         <CardTitle className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-energy-600 dark:text-energy-400" />
@@ -152,7 +139,7 @@ const CurrentValuesPieChart = () => {
       </CardHeader>
       <CardContent className="p-6">
         {filteredData.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-2">
             <div className="w-full h-64 animate-fade-in">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -167,7 +154,7 @@ const CurrentValuesPieChart = () => {
                         y2="100%"
                       >
                         <stop offset="0%" stopColor={entry.color} stopOpacity={0.9}/>
-                        <stop offset="100%" stopColor={entry.endColor} stopOpacity={0.7}/>
+                        <stop offset="100%" stopColor={entry.color} stopOpacity={0.7}/>
                       </linearGradient>
                     ))}
                   </defs>

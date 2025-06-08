@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -45,12 +46,12 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
       // Use channel number - 1 for consistent color indexing (House1 = index 0, House2 = index 1, etc.)
       const colorIndex = (channelNumber - 1) % GRADIENT_COLORS.length;
       
-      // Improved online detection - check if we have recent readings (within last 20 seconds)
+      // Improved online detection - check if we have recent readings (within last 5 seconds)
       const latestChannelReading = channelReadings
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
       
       const isChannelOnline = latestChannelReading ? 
-        (Date.now() - new Date(latestChannelReading.timestamp).getTime()) < 20000 : false; // 20 seconds
+        (Date.now() - new Date(latestChannelReading.timestamp).getTime()) < 5000 : false; // 5 seconds
       
       // Get latest current reading
       const currentValue = (latestChannelReading && isChannelOnline) ? latestChannelReading.current || 0 : 0;
@@ -103,7 +104,7 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
 
   if (!selectedDevice) {
     return (
-      <Card className="energy-card">
+      <Card className="energy-card h-[500px]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-energy-600 dark:text-energy-400" />
@@ -126,7 +127,7 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
   }
 
   return (
-    <Card className="energy-card">
+    <Card className="energy-card h-[500px]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="w-5 h-5 text-energy-600 dark:text-energy-400" />
