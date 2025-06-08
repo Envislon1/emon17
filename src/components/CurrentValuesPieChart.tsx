@@ -39,9 +39,9 @@ const CurrentValuesPieChart = () => {
       const latestReading = channelReadings[0];
       const currentValue = latestReading?.current || 0;
       
-      // Check if device is online (received data in last minute)
+      // Improved online detection - check if device is online (received data in last 2 minutes)
       const isOnline = latestReading ? 
-        (Date.now() - new Date(latestReading.timestamp).getTime()) < 60000 : false;
+        (Date.now() - new Date(latestReading.timestamp).getTime()) < 120000 : false; // 2 minutes
       
       // Use channel number - 1 for consistent color indexing (House1 = index 0, House2 = index 1, etc.)
       const colorIndex = (channelNumber - 1) % GRADIENT_COLORS.length;
@@ -88,14 +88,25 @@ const CurrentValuesPieChart = () => {
 
   const CustomLegend = ({ payload }: any) => {
     return (
-      <div className="flex flex-wrap justify-center gap-3 mt-6">
+      <div className="flex flex-wrap justify-center gap-4 mt-6">
         {payload?.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 hover:bg-muted transition-colors">
-            <div 
-              className="w-3 h-3 rounded-full shadow-sm" 
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-xs font-medium text-muted-foreground">{entry.value}</span>
+          <div key={index} className="flex items-center gap-3 px-4 py-2 rounded-full bg-muted/50 hover:bg-muted transition-colors shadow-sm">
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-4 h-4 rounded-full shadow-sm border border-white/20" 
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-sm font-medium text-foreground">{entry.value}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-full ${
+                filteredData.find(item => item.name === entry.value)?.isOnline ? 
+                'bg-green-500 animate-pulse' : 'bg-red-500'
+              }`} />
+              <span className="text-xs text-muted-foreground">
+                {filteredData.find(item => item.name === entry.value)?.isOnline ? 'Live' : 'Offline'}
+              </span>
+            </div>
           </div>
         ))}
       </div>

@@ -45,18 +45,15 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
       // Use channel number - 1 for consistent color indexing (House1 = index 0, House2 = index 1, etc.)
       const colorIndex = (channelNumber - 1) % GRADIENT_COLORS.length;
       
-      // Determine if this channel is online based on recent readings
-      const isChannelOnline = channelReadings.length > 0 && channelReadings.some(reading => 
-        (Date.now() - new Date(reading.timestamp).getTime()) < 60000
-      );
-      
-      // Override online status if no devices are active
-      const isOnline = activeDevices > 0 && isChannelOnline;
-      
-      // Get latest current reading
+      // Improved online detection - check if we have recent readings (within last 2 minutes)
       const latestChannelReading = channelReadings
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-      const currentValue = (latestChannelReading && isOnline) ? latestChannelReading.current || 0 : 0;
+      
+      const isChannelOnline = latestChannelReading ? 
+        (Date.now() - new Date(latestChannelReading.timestamp).getTime()) < 120000 : false; // 2 minutes
+      
+      // Get latest current reading
+      const currentValue = (latestChannelReading && isChannelOnline) ? latestChannelReading.current || 0 : 0;
       
       return {
         name: channel.custom_name || `House${channelNumber}`,
@@ -65,7 +62,7 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
         cost: Number(channelCost.toFixed(2)),
         color: GRADIENT_COLORS[colorIndex],
         gradientId: `gradient-${channelNumber}`,
-        isOnline,
+        isOnline: isChannelOnline,
         deviceId: selectedDeviceId,
         channelNumber: channelNumber
       };
