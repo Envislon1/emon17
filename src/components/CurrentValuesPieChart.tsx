@@ -6,8 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Zap } from 'lucide-react';
 
 const GRADIENT_COLORS = [
-  '#f97316', '#3b82f6', '#10b981', '#8b5cf6', 
-  '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'
+  { start: '#f97316', end: '#ea580c' }, // Orange gradient
+  { start: '#3b82f6', end: '#1d4ed8' }, // Blue gradient  
+  { start: '#10b981', end: '#059669' }, // Green gradient
+  { start: '#8b5cf6', end: '#7c3aed' }, // Purple gradient
+  { start: '#f59e0b', end: '#d97706' }, // Amber gradient
+  { start: '#ef4444', end: '#dc2626' }, // Red gradient
+  { start: '#06b6d4', end: '#0891b2' }, // Cyan gradient
+  { start: '#84cc16', end: '#65a30d' }, // Lime gradient
 ];
 
 const CurrentValuesPieChart = () => {
@@ -44,7 +50,9 @@ const CurrentValuesPieChart = () => {
       return {
         name: channel.custom_name || `House${channelNumber}`,
         value: Number(currentValue.toFixed(2)),
-        color: GRADIENT_COLORS[colorIndex],
+        color: GRADIENT_COLORS[colorIndex].start,
+        endColor: GRADIENT_COLORS[colorIndex].end,
+        gradientId: `gradient-${i}`,
         isOnline,
         deviceId: selectedDeviceId,
         channelNumber: channelNumber
@@ -59,16 +67,19 @@ const CurrentValuesPieChart = () => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-card p-3 rounded-lg shadow-lg border border-border">
-          <p className="font-medium text-foreground">{data.name}</p>
-          <p className="text-sm text-muted-foreground">
-            Current: {data.value.toFixed(2)} A
-          </p>
-          <div className="flex items-center gap-2 mt-1">
-            <div className={`w-2 h-2 rounded-full ${data.isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-xs text-muted-foreground">
-              {data.isOnline ? 'Online' : 'Offline'}
-            </span>
+        <div className="bg-card/95 backdrop-blur-sm p-4 rounded-xl shadow-xl border border-border/50 animate-fade-in">
+          <p className="font-semibold text-foreground text-sm mb-2">{data.name}</p>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: data.color }}></span>
+              Current: <span className="font-medium text-foreground">{data.value.toFixed(2)} A</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${data.isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-xs text-muted-foreground">
+                {data.isOnline ? 'Live' : 'Offline'}
+              </span>
+            </div>
           </div>
         </div>
       );
@@ -78,14 +89,14 @@ const CurrentValuesPieChart = () => {
 
   const CustomLegend = ({ payload }: any) => {
     return (
-      <div className="flex flex-wrap justify-center gap-4 mt-4">
+      <div className="flex flex-wrap justify-center gap-3 mt-6">
         {payload?.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2">
+          <div key={index} className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 hover:bg-muted transition-colors">
             <div 
-              className="w-3 h-3 rounded-full" 
+              className="w-3 h-3 rounded-full shadow-sm" 
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-sm text-muted-foreground">{entry.value}</span>
+            <span className="text-xs font-medium text-muted-foreground">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -94,8 +105,8 @@ const CurrentValuesPieChart = () => {
 
   if (!selectedDevice) {
     return (
-      <Card className="energy-card">
-        <CardHeader>
+      <Card className="energy-card overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-energy-50 to-energy-100 dark:from-energy-900/20 dark:to-energy-800/20">
           <CardTitle className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-energy-600 dark:text-energy-400" />
             Real-time Current Values
@@ -103,10 +114,15 @@ const CurrentValuesPieChart = () => {
         </CardHeader>
         <CardContent>
           <div className="w-full h-80 flex items-center justify-center">
-            <div className="text-center">
-              <Zap className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No device selected</p>
-              <p className="text-sm text-muted-foreground mt-2">
+            <div className="text-center animate-fade-in">
+              <div className="relative">
+                <Zap className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                <div className="absolute inset-0 w-16 h-16 mx-auto animate-pulse-energy">
+                  <Zap className="w-16 h-16 text-energy-400/50" />
+                </div>
+              </div>
+              <p className="text-muted-foreground font-medium">No device selected</p>
+              <p className="text-sm text-muted-foreground mt-2 max-w-xs">
                 Please add a device to see real-time current values
               </p>
             </div>
@@ -117,34 +133,56 @@ const CurrentValuesPieChart = () => {
   }
 
   return (
-    <Card className="energy-card">
-      <CardHeader>
+    <Card className="energy-card overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-energy-50 to-energy-100 dark:from-energy-900/20 dark:to-energy-800/20">
         <CardTitle className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-energy-600 dark:text-energy-400" />
           Real-time Current Values - {selectedDevice.custom_name || selectedDevice.device_name}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         {filteredData.length > 0 ? (
-          <div className="w-full h-80">
+          <div className="w-full h-80 animate-fade-in">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
+                <defs>
+                  {filteredData.map((entry, index) => (
+                    <linearGradient
+                      key={entry.gradientId}
+                      id={entry.gradientId}
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="100%"
+                    >
+                      <stop offset="0%" stopColor={entry.color} stopOpacity={0.9}/>
+                      <stop offset="100%" stopColor={entry.endColor} stopOpacity={0.7}/>
+                    </linearGradient>
+                  ))}
+                </defs>
                 <Pie
                   data={filteredData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={100}
-                  innerRadius={40}
-                  paddingAngle={2}
+                  outerRadius={110}
+                  innerRadius={55}
+                  paddingAngle={3}
                   dataKey="value"
+                  animationBegin={0}
+                  animationDuration={800}
+                  animationEasing="ease-out"
                 >
                   {filteredData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={entry.color}
-                      stroke={entry.isOnline ? entry.color : '#9ca3af'}
-                      strokeWidth={entry.isOnline ? 1 : 2}
-                      strokeDasharray={entry.isOnline ? '0' : '5,5'}
+                      fill={`url(#${entry.gradientId})`}
+                      stroke={entry.isOnline ? "rgba(255,255,255,0.8)" : '#9ca3af'}
+                      strokeWidth={entry.isOnline ? 2 : 1}
+                      strokeDasharray={entry.isOnline ? '0' : '4,2'}
+                      style={{
+                        filter: entry.isOnline ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))' : 'none',
+                        transition: 'all 0.3s ease'
+                      }}
                     />
                   ))}
                 </Pie>
@@ -155,10 +193,15 @@ const CurrentValuesPieChart = () => {
           </div>
         ) : (
           <div className="w-full h-80 flex items-center justify-center">
-            <div className="text-center">
-              <Zap className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No active current readings</p>
-              <p className="text-sm text-muted-foreground mt-2">
+            <div className="text-center animate-fade-in">
+              <div className="relative">
+                <Zap className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                <div className="absolute inset-0 w-16 h-16 mx-auto animate-pulse-energy">
+                  <Zap className="w-16 h-16 text-energy-400/50" />
+                </div>
+              </div>
+              <p className="text-muted-foreground font-medium">No active current readings</p>
+              <p className="text-sm text-muted-foreground mt-2 max-w-xs">
                 Current values will appear when devices are online and reporting
               </p>
             </div>
