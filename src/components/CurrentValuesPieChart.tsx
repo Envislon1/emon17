@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useEnergy } from '@/contexts/EnergyContext';
@@ -6,14 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Zap } from 'lucide-react';
 
 const GRADIENT_COLORS = [
-  { start: '#f97316', end: '#ea580c' }, // Orange gradient
-  { start: '#3b82f6', end: '#1d4ed8' }, // Blue gradient  
-  { start: '#10b981', end: '#059669' }, // Green gradient
-  { start: '#8b5cf6', end: '#7c3aed' }, // Purple gradient
-  { start: '#f59e0b', end: '#d97706' }, // Amber gradient
-  { start: '#ef4444', end: '#dc2626' }, // Red gradient
-  { start: '#06b6d4', end: '#0891b2' }, // Cyan gradient
-  { start: '#84cc16', end: '#65a30d' }, // Lime gradient
+  { start: '#f97316', end: '#ea580c' }, // Orange gradient - House1
+  { start: '#3b82f6', end: '#1d4ed8' }, // Blue gradient - House2
+  { start: '#10b981', end: '#059669' }, // Green gradient - House3
+  { start: '#8b5cf6', end: '#7c3aed' }, // Purple gradient - House4
+  { start: '#f59e0b', end: '#d97706' }, // Amber gradient - House5
+  { start: '#ef4444', end: '#dc2626' }, // Red gradient - House6
+  { start: '#06b6d4', end: '#0891b2' }, // Cyan gradient - House7
+  { start: '#84cc16', end: '#65a30d' }, // Lime gradient - House8
 ];
 
 const CurrentValuesPieChart = () => {
@@ -44,15 +43,15 @@ const CurrentValuesPieChart = () => {
       const isOnline = latestReading ? 
         (Date.now() - new Date(latestReading.timestamp).getTime()) < 60000 : false;
       
-      // Use consistent color indexing - channel index directly
-      const colorIndex = i % GRADIENT_COLORS.length;
+      // Use channel number - 1 for consistent color indexing (House1 = index 0, House2 = index 1, etc.)
+      const colorIndex = (channelNumber - 1) % GRADIENT_COLORS.length;
       
       return {
         name: channel.custom_name || `House${channelNumber}`,
         value: Number(currentValue.toFixed(2)),
         color: GRADIENT_COLORS[colorIndex].start,
         endColor: GRADIENT_COLORS[colorIndex].end,
-        gradientId: `gradient-${i}`,
+        gradientId: `gradient-${channelNumber}`,
         isOnline,
         deviceId: selectedDeviceId,
         channelNumber: channelNumber

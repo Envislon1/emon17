@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -43,8 +42,8 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
       // Calculate cost: (Channel Energy / Total Device Energy) * Total Bill
       const channelCost = totalDeviceEnergy > 0 ? (channelEnergy / totalDeviceEnergy) * totalBillAmount : 0;
       
-      // Fixed color indexing - use channel index directly for consistent colors
-      const colorIndex = i % GRADIENT_COLORS.length;
+      // Use channel number - 1 for consistent color indexing (House1 = index 0, House2 = index 1, etc.)
+      const colorIndex = (channelNumber - 1) % GRADIENT_COLORS.length;
       
       // Determine if this channel is online based on recent readings
       const isChannelOnline = channelReadings.length > 0 && channelReadings.some(reading => 
