@@ -39,9 +39,9 @@ const CurrentValuesPieChart = () => {
       const latestReading = channelReadings[0];
       const currentValue = latestReading?.current || 0;
       
-      // Improved online detection - check if device is online (received data in last 2 minutes)
+      // Improved online detection - check if device is online (received data in last 20 seconds)
       const isOnline = latestReading ? 
-        (Date.now() - new Date(latestReading.timestamp).getTime()) < 120000 : false; // 2 minutes
+        (Date.now() - new Date(latestReading.timestamp).getTime()) < 20000 : false; // 20 seconds
       
       // Use channel number - 1 for consistent color indexing (House1 = index 0, House2 = index 1, etc.)
       const colorIndex = (channelNumber - 1) % GRADIENT_COLORS.length;
@@ -88,22 +88,22 @@ const CurrentValuesPieChart = () => {
 
   const CustomLegend = ({ payload }: any) => {
     return (
-      <div className="flex flex-wrap justify-center gap-4 mt-6">
+      <div className="flex flex-wrap justify-center gap-3 mt-4">
         {payload?.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-3 px-4 py-2 rounded-full bg-muted/50 hover:bg-muted transition-colors shadow-sm">
-            <div className="flex items-center gap-2">
+          <div key={index} className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 hover:bg-muted transition-colors shadow-sm text-xs">
+            <div className="flex items-center gap-1">
               <div 
-                className="w-4 h-4 rounded-full shadow-sm border border-white/20" 
+                className="w-3 h-3 rounded-full shadow-sm border border-white/20" 
                 style={{ backgroundColor: entry.color }}
               />
-              <span className="text-sm font-medium text-foreground">{entry.value}</span>
+              <span className="font-medium text-foreground">{entry.value}</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className={`w-2 h-2 rounded-full ${
+              <div className={`w-1.5 h-1.5 rounded-full ${
                 filteredData.find(item => item.name === entry.value)?.isOnline ? 
                 'bg-green-500 animate-pulse' : 'bg-red-500'
               }`} />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground">
                 {filteredData.find(item => item.name === entry.value)?.isOnline ? 'Live' : 'Offline'}
               </span>
             </div>
@@ -152,54 +152,56 @@ const CurrentValuesPieChart = () => {
       </CardHeader>
       <CardContent className="p-6">
         {filteredData.length > 0 ? (
-          <div className="w-full h-80 animate-fade-in">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <defs>
-                  {filteredData.map((entry, index) => (
-                    <linearGradient
-                      key={entry.gradientId}
-                      id={entry.gradientId}
-                      x1="0%"
-                      y1="0%"
-                      x2="100%"
-                      y2="100%"
-                    >
-                      <stop offset="0%" stopColor={entry.color} stopOpacity={0.9}/>
-                      <stop offset="100%" stopColor={entry.endColor} stopOpacity={0.7}/>
-                    </linearGradient>
-                  ))}
-                </defs>
-                <Pie
-                  data={filteredData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={110}
-                  innerRadius={55}
-                  paddingAngle={3}
-                  dataKey="value"
-                  animationBegin={0}
-                  animationDuration={800}
-                  animationEasing="ease-out"
-                >
-                  {filteredData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={`url(#${entry.gradientId})`}
-                      stroke={entry.isOnline ? "rgba(255,255,255,0.8)" : '#9ca3af'}
-                      strokeWidth={entry.isOnline ? 2 : 1}
-                      strokeDasharray={entry.isOnline ? '0' : '4,2'}
-                      style={{
-                        filter: entry.isOnline ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))' : 'none',
-                        transition: 'all 0.3s ease'
-                      }}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend content={<CustomLegend />} />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="space-y-4">
+            <div className="w-full h-64 animate-fade-in">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <defs>
+                    {filteredData.map((entry, index) => (
+                      <linearGradient
+                        key={entry.gradientId}
+                        id={entry.gradientId}
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="100%"
+                      >
+                        <stop offset="0%" stopColor={entry.color} stopOpacity={0.9}/>
+                        <stop offset="100%" stopColor={entry.endColor} stopOpacity={0.7}/>
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <Pie
+                    data={filteredData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    innerRadius={45}
+                    paddingAngle={3}
+                    dataKey="value"
+                    animationBegin={0}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  >
+                    {filteredData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={`url(#${entry.gradientId})`}
+                        stroke={entry.isOnline ? "rgba(255,255,255,0.8)" : '#9ca3af'}
+                        strokeWidth={entry.isOnline ? 2 : 1}
+                        strokeDasharray={entry.isOnline ? '0' : '4,2'}
+                        style={{
+                          filter: entry.isOnline ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))' : 'none',
+                          transition: 'all 0.3s ease'
+                        }}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend content={<CustomLegend />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         ) : (
           <div className="w-full h-80 flex items-center justify-center">

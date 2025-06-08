@@ -45,12 +45,12 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
       // Use channel number - 1 for consistent color indexing (House1 = index 0, House2 = index 1, etc.)
       const colorIndex = (channelNumber - 1) % GRADIENT_COLORS.length;
       
-      // Improved online detection - check if we have recent readings (within last 2 minutes)
+      // Improved online detection - check if we have recent readings (within last 20 seconds)
       const latestChannelReading = channelReadings
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
       
       const isChannelOnline = latestChannelReading ? 
-        (Date.now() - new Date(latestChannelReading.timestamp).getTime()) < 120000 : false; // 2 minutes
+        (Date.now() - new Date(latestChannelReading.timestamp).getTime()) < 20000 : false; // 20 seconds
       
       // Get latest current reading
       const currentValue = (latestChannelReading && isChannelOnline) ? latestChannelReading.current || 0 : 0;
