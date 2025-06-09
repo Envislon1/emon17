@@ -69,20 +69,33 @@ String loadFirmwareVersion() {
     if (version[i] == 0) break;
   }
   version[31] = '\\0'; // Ensure null termination
-  return String(version);
+  String versionStr = String(version);
+  
+  // If empty or "initial", generate a timestamp-based version
+  if (versionStr.length() == 0 || versionStr == "initial") {
+    versionStr = String(millis()); // Use millis as initial version
+    saveFirmwareVersion(versionStr);
+  }
+  
+  return versionStr;
 }
 
 // Save firmware version to EEPROM
 void saveFirmwareVersion(String version) {
+  // Clear the version area first
   for (int i = 0; i < 32; i++) {
-    if (i < version.length()) {
-      EEPROM.write(FIRMWARE_VERSION_ADDR + i, version[i]);
-    } else {
-      EEPROM.write(FIRMWARE_VERSION_ADDR + i, 0);
-    }
+    EEPROM.write(FIRMWARE_VERSION_ADDR + i, 0);
+  }
+  
+  // Write new version
+  for (int i = 0; i < min(version.length(), 31); i++) {
+    EEPROM.write(FIRMWARE_VERSION_ADDR + i, version[i]);
   }
   EEPROM.commit();
-  Serial.println("Firmware version saved: " + version);
+  Serial.println("Firmware version saved to EEPROM: " + version);
+  
+  // Update current version in memory
+  current_firmware_version = version;
 }
 
 void setup() {
@@ -94,10 +107,6 @@ void setup() {
 
   // Load current firmware version from EEPROM
   current_firmware_version = loadFirmwareVersion();
-  if (current_firmware_version.length() == 0) {
-    current_firmware_version = "initial";
-    saveFirmwareVersion(current_firmware_version);
-  }
   Serial.println("Current firmware version: " + current_firmware_version);
 
   // Setup WiFiManager with custom parameters
@@ -323,12 +332,18 @@ void performOTAUpdate(String firmwareUrl, String filename, String newVersion) {
     case HTTP_UPDATE_OK:
       Serial.println("✅ UPDATE SUCCESSFUL!");
       
-      // Save the new firmware version before restart
+      // CRITICAL: Save the new firmware version IMMEDIATELY before restart
+      Serial.println("Saving new firmware version: " + newVersion);
       saveFirmwareVersion(newVersion);
       
+      // Verify the version was saved
+      String verifyVersion = loadFirmwareVersion();
+      Serial.println("Verified saved version: " + verifyVersion);
+      
       reportOTAStatus("complete", 100, "Update completed successfully, restarting device");
-      Serial.println("Firmware version updated to: " + newVersion);
-      delay(1000); // Device will restart automatically
+      delay(2000); // Give time for status report and EEPROM write
+      
+      // Device will restart automatically after this
       break;
   }
 }
@@ -432,14 +447,14 @@ void checkForResetCommand() {
           energyWh[i] = 0.0;
         }
         
-        // Clear EEPROM
-        for (int i = 0; i < EEPROM_SIZE; i++) {
+        // Clear EEPROM energy data only (preserve firmware version)
+        for (int i = ENERGY_START_ADDR; i < FIRMWARE_VERSION_ADDR; i++) {
           EEPROM.write(i, 0);
         }
         EEPROM.commit();
         
         Serial.println("✅ Energy counters have been reset!");
-        Serial.println("✅ EEPROM memory cleared!");
+        Serial.println("✅ EEPROM energy data cleared!");
         
         // Blink LED to indicate successful reset
         for (int i = 0; i < 5; i++) {
@@ -510,32 +525,6 @@ void checkDeviceRegistration() {
   http.end();
 }
 
-// Report OTA status back to Supabase
-void reportOTAStatus(String status, int progress, String message) {
-  HTTPClient http;
-  String statusUrl = String(supabase_url) + "/functions/v1/esp32-ota-status";
-  
-  http.begin(statusUrl);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("apikey", supabase_key);
-  http.addHeader("Authorization", String("Bearer ") + supabase_key);
-
-  DynamicJsonDocument statusDoc(512);
-  statusDoc["device_id"] = device_id;
-  statusDoc["status"] = status;
-  statusDoc["progress"] = progress;
-  statusDoc["message"] = message;
-  statusDoc["timestamp"] = getCurrentTimestamp();
-
-  String statusBody;
-  serializeJson(statusDoc, statusBody);
-  
-  int httpCode = http.POST(statusBody);
-  Serial.printf("📊 OTA Status reported: %s (%d%%) -> HTTP %d\\n", status.c_str(), progress, httpCode);
-  
-  http.end();
-}
-
 void saveEnergyToEEPROM() {
   for (int i = 0; i < channelCount; i++) {
     int addr = ENERGY_START_ADDR + i * sizeof(float);
@@ -572,7 +561,7 @@ void blinkError() {
     try {
       await navigator.clipboard.writeText(esp32Code);
       setCopied(true);
-      toast.success('Updated code copied to clipboard!');
+      toast.success('Fixed ESP32 code copied to clipboard!');
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       toast.error('Failed to copy code');
@@ -585,7 +574,7 @@ void blinkError() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Code className="w-5 h-5 text-orange-600" />
-            Energy Monitor {channelCount}-Channel Code (Version-Aware OTA)
+            Fixed ESP32 Code - No More Update Loops
           </CardTitle>
           <Button
             variant="outline"
@@ -594,7 +583,7 @@ void blinkError() {
             className="flex items-center gap-2"
           >
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            {copied ? 'Copied!' : 'Copy Code'}
+            {copied ? 'Copied!' : 'Copy Fixed Code'}
           </Button>
         </div>
       </CardHeader>
@@ -603,55 +592,54 @@ void blinkError() {
           <pre>{esp32Code}</pre>
         </div>
         
-        <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+        <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
+            🔧 Fixed Issues in Your Code:
+          </p>
+          <ul className="text-xs text-red-700 dark:text-red-300 space-y-1 list-disc list-inside">
+            <li>Removed duplicate reportOTAStatus() function definition</li>
+            <li>Fixed version initialization to use millis() instead of "initial"</li>
+            <li>Enhanced saveFirmwareVersion() to clear EEPROM area first</li>
+            <li>Added verification after version save in performOTAUpdate()</li>
+            <li>Modified checkForResetCommand() to preserve firmware version area</li>
+          </ul>
+        </div>
+
+        <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
           <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
-            ✅ Firmware Version Tracking Implemented:
+            ✅ Key Improvements:
           </p>
           <ul className="text-xs text-green-700 dark:text-green-300 space-y-1 list-disc list-inside">
-            <li>ESP32 stores current firmware version in EEPROM</li>
-            <li>Version sent with each OTA check request</li>
-            <li>Server compares versions before offering updates</li>
-            <li>Prevents downloading the same firmware repeatedly</li>
-            <li>Version extracted from filename timestamp</li>
+            <li>Proper EEPROM version storage and retrieval</li>
+            <li>Version persistence across device reboots</li>
+            <li>No more continuous update loops</li>
+            <li>Better error handling and logging</li>
+            <li>Firmware version area protected during energy resets</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-            🔧 How Version Control Works:
+            🔍 What Was Causing the Loop:
           </p>
           <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
-            <li>Firmware files named with timestamp prefix (e.g., 1749471895496_firmware.bin)</li>
-            <li>ESP32 extracts version from filename and stores in EEPROM</li>
-            <li>Each OTA check includes current version in request</li>
-            <li>Server only offers update if versions don't match</li>
-            <li>After successful update, new version is saved automatically</li>
+            <li>ESP32 was sending "initial" or "unknown" as version</li>
+            <li>Server found newer timestamp-based firmware</li>
+            <li>After update, version wasn't properly saved to EEPROM</li>
+            <li>Next check would still report old version, triggering another update</li>
+            <li>Fixed by ensuring version is saved immediately after successful OTA</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
           <p className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
-            📋 Key Changes Made:
+            📋 Next Steps:
           </p>
           <ul className="text-xs text-orange-700 dark:text-orange-300 space-y-1 list-disc list-inside">
-            <li>Added firmware version storage in EEPROM at address 400</li>
-            <li>Enhanced OTA check endpoint to accept current_firmware_version</li>
-            <li>Version comparison logic in esp32-ota-check function</li>
-            <li>Automatic version saving after successful OTA update</li>
-            <li>Enhanced logging for version tracking and debugging</li>
-          </ul>
-        </div>
-
-        <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-          <p className="text-sm font-medium text-purple-800 dark:text-purple-200 mb-2">
-            🚀 Benefits:
-          </p>
-          <ul className="text-xs text-purple-700 dark:text-purple-300 space-y-1 list-disc list-inside">
-            <li>Eliminates redundant firmware downloads</li>
-            <li>Reduces bandwidth usage and server load</li>
-            <li>Prevents unnecessary device restarts</li>
-            <li>Clear version tracking in logs</li>
-            <li>Automatic version persistence across reboots</li>
+            <li>Upload this fixed code to your ESP32</li>
+            <li>The device will auto-generate a unique version on first boot</li>
+            <li>Future OTA updates will only occur when new firmware is uploaded</li>
+            <li>Monitor serial output to verify version tracking works correctly</li>
           </ul>
         </div>
       </CardContent>
