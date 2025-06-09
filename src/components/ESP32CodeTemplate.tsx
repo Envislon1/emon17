@@ -87,8 +87,8 @@ void saveFirmwareVersion(String version) {
     EEPROM.write(FIRMWARE_VERSION_ADDR + i, 0);
   }
   
-  // Write new version
-  for (int i = 0; i < min(version.length(), 31); i++) {
+  // Write new version - fix type mismatch by casting to int
+  for (int i = 0; i < (int)version.length() && i < 31; i++) {
     EEPROM.write(FIRMWARE_VERSION_ADDR + i, version[i]);
   }
   EEPROM.commit();
@@ -574,7 +574,7 @@ void blinkError() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Code className="w-5 h-5 text-orange-600" />
-            Fixed ESP32 Code - No More Update Loops
+            Fixed ESP32 Code - Compilation Error Resolved
           </CardTitle>
           <Button
             variant="outline"
@@ -594,52 +594,37 @@ void blinkError() {
         
         <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
-            🔧 Fixed Issues in Your Code:
+            🔧 Fixed Compilation Error:
           </p>
           <ul className="text-xs text-red-700 dark:text-red-300 space-y-1 list-disc list-inside">
-            <li>Removed duplicate reportOTAStatus() function definition</li>
-            <li>Fixed version initialization to use millis() instead of "initial"</li>
-            <li>Enhanced saveFirmwareVersion() to clear EEPROM area first</li>
-            <li>Added verification after version save in performOTAUpdate()</li>
-            <li>Modified checkForResetCommand() to preserve firmware version area</li>
+            <li>Changed `min(version.length(), 31)` to `(int)version.length() && i < 31`</li>
+            <li>Resolved type mismatch between unsigned int and int</li>
+            <li>Added explicit type casting to fix template deduction</li>
+            <li>Maintained the same functionality with proper bounds checking</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
           <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
-            ✅ Key Improvements:
+            ✅ What Was Fixed:
           </p>
           <ul className="text-xs text-green-700 dark:text-green-300 space-y-1 list-disc list-inside">
-            <li>Proper EEPROM version storage and retrieval</li>
-            <li>Version persistence across device reboots</li>
-            <li>No more continuous update loops</li>
-            <li>Better error handling and logging</li>
-            <li>Firmware version area protected during energy resets</li>
+            <li>The ESP32 compiler couldn't resolve the min() template with mixed types</li>
+            <li>Cast version.length() to int to match the literal 31</li>
+            <li>Used logical AND (&&) for proper bounds checking</li>
+            <li>Code now compiles successfully on ESP32 Arduino framework</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-            🔍 What Was Causing the Loop:
-          </p>
-          <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
-            <li>ESP32 was sending "initial" or "unknown" as version</li>
-            <li>Server found newer timestamp-based firmware</li>
-            <li>After update, version wasn't properly saved to EEPROM</li>
-            <li>Next check would still report old version, triggering another update</li>
-            <li>Fixed by ensuring version is saved immediately after successful OTA</li>
-          </ul>
-        </div>
-
-        <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-          <p className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
             📋 Next Steps:
           </p>
-          <ul className="text-xs text-orange-700 dark:text-orange-300 space-y-1 list-disc list-inside">
-            <li>Upload this fixed code to your ESP32</li>
-            <li>The device will auto-generate a unique version on first boot</li>
-            <li>Future OTA updates will only occur when new firmware is uploaded</li>
-            <li>Monitor serial output to verify version tracking works correctly</li>
+          <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
+            <li>Copy this fixed code to your Arduino IDE</li>
+            <li>The compilation error should now be resolved</li>
+            <li>Upload to your ESP32 device</li>
+            <li>The OTA update loop issue should also be fixed</li>
           </ul>
         </div>
       </CardContent>
