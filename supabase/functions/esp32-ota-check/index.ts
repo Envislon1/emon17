@@ -30,7 +30,7 @@ serve(async (req) => {
     )
 
     const requestData = await req.json()
-    const { device_id } = requestData
+    const { device_id, current_firmware_version } = requestData
 
     if (!device_id) {
       return new Response(
@@ -42,7 +42,7 @@ serve(async (req) => {
       )
     }
 
-    console.log(`Checking for firmware updates for device: ${device_id}`)
+    console.log(`Checking for firmware updates for device: ${device_id}, current version: ${current_firmware_version || 'unknown'}`)
 
     // Check if firmware-updates bucket exists
     const { data: buckets } = await supabaseClient.storage.listBuckets()
@@ -50,8 +50,6 @@ serve(async (req) => {
     
     if (!firmwareBucket) {
       console.log('Firmware-updates bucket not found, but continuing with file check...')
-      // Instead of trying to create the bucket here, just return no updates available
-      // The bucket should be created through the dashboard or SQL migration
       return new Response(
         JSON.stringify({ 
           has_update: false,
@@ -104,18 +102,39 @@ serve(async (req) => {
     const latestFirmware = files[0]
     const firmwarePath = `firmware/${device_id}/${latestFirmware.name}`
 
+    // Extract version from filename (timestamp_filename format)
+    const latestVersion = latestFirmware.name.split('_')[0]
+
+    // Check if device already has this version
+    if (current_firmware_version && current_firmware_version === latestVersion) {
+      console.log(`Device ${device_id} already has the latest firmware version: ${latestVersion}`)
+      return new Response(
+        JSON.stringify({ 
+          has_update: false,
+          message: 'Device already has the latest firmware version',
+          current_version: current_firmware_version,
+          latest_version: latestVersion
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
     // Get public URL for the firmware
     const { data: urlData } = supabaseClient.storage
       .from('firmware-updates')
       .getPublicUrl(firmwarePath)
 
-    console.log(`Firmware update available for ${device_id}: ${latestFirmware.name}`)
+    console.log(`Firmware update available for ${device_id}: ${latestFirmware.name} (version ${latestVersion})`)
 
     return new Response(
       JSON.stringify({
         has_update: true,
         firmware_url: urlData.publicUrl,
         filename: latestFirmware.name,
+        firmware_version: latestVersion,
         file_size: latestFirmware.metadata?.size || 0,
         uploaded_at: latestFirmware.created_at
       }),

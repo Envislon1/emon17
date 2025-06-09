@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ const ESP32CodeTemplate: React.FC<ESP32CodeTemplateProps> = ({
 #define MAX_CHANNELS 16
 #define EEPROM_SIZE 512
 #define ENERGY_START_ADDR 0
+#define FIRMWARE_VERSION_ADDR 400  // Store firmware version at EEPROM address 400
 #define VOLTAGE 220.0
 #define EEPROM_WRITE_INTERVAL 5 * 60 * 1000UL  // 5 minutes
 #define RESET_CHECK_INTERVAL 30 * 1000UL       // 30 seconds
@@ -47,6 +49,7 @@ unsigned long lastEEPROMWrite = 0;
 unsigned long lastResetCheck = 0;
 unsigned long lastOTACheck = 0;
 bool device_registered = false;
+String current_firmware_version = "";
 
 // WiFiManager custom parameters
 char customChannelCount[3] = "${channelCount}";
@@ -58,12 +61,44 @@ unsigned long getCurrentTimestamp() {
   return millis() / 1000; // Simple timestamp based on device uptime
 }
 
+// Load firmware version from EEPROM
+String loadFirmwareVersion() {
+  char version[32];
+  for (int i = 0; i < 32; i++) {
+    version[i] = EEPROM.read(FIRMWARE_VERSION_ADDR + i);
+    if (version[i] == 0) break;
+  }
+  version[31] = '\\0'; // Ensure null termination
+  return String(version);
+}
+
+// Save firmware version to EEPROM
+void saveFirmwareVersion(String version) {
+  for (int i = 0; i < 32; i++) {
+    if (i < version.length()) {
+      EEPROM.write(FIRMWARE_VERSION_ADDR + i, version[i]);
+    } else {
+      EEPROM.write(FIRMWARE_VERSION_ADDR + i, 0);
+    }
+  }
+  EEPROM.commit();
+  Serial.println("Firmware version saved: " + version);
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
   EEPROM.begin(EEPROM_SIZE);
+
+  // Load current firmware version from EEPROM
+  current_firmware_version = loadFirmwareVersion();
+  if (current_firmware_version.length() == 0) {
+    current_firmware_version = "initial";
+    saveFirmwareVersion(current_firmware_version);
+  }
+  Serial.println("Current firmware version: " + current_firmware_version);
 
   // Setup WiFiManager with custom parameters
   WiFiManager wm;
@@ -185,6 +220,7 @@ void updateCallback(size_t progress, size_t total) {
 // Check for OTA updates from Supabase
 void checkForOTAUpdates() {
   Serial.println("🔍 Checking for firmware updates...");
+  Serial.println("Current firmware version: " + current_firmware_version);
   
   HTTPClient http;
   http.begin(ota_check_url);
@@ -192,9 +228,10 @@ void checkForOTAUpdates() {
   http.addHeader("apikey", supabase_key);
   http.addHeader("Authorization", String("Bearer ") + supabase_key);
 
-  // Create request payload
-  DynamicJsonDocument requestDoc(256);
+  // Create request payload with current firmware version
+  DynamicJsonDocument requestDoc(512);
   requestDoc["device_id"] = device_id;
+  requestDoc["current_firmware_version"] = current_firmware_version;
   String requestBody;
   serializeJson(requestDoc, requestBody);
 
@@ -211,19 +248,30 @@ void checkForOTAUpdates() {
       if (hasUpdate) {
         String firmwareUrl = responseDoc["firmware_url"];
         String filename = responseDoc["filename"];
+        String firmwareVersion = responseDoc["firmware_version"];
         int fileSize = responseDoc["file_size"];
         
         Serial.println("🚀 FIRMWARE UPDATE AVAILABLE!");
         Serial.println("URL: " + firmwareUrl);
         Serial.println("File: " + filename + " (" + String(fileSize) + " bytes)");
+        Serial.println("New Version: " + firmwareVersion);
+        Serial.println("Current Version: " + current_firmware_version);
         
         // Report update start
         reportOTAStatus("starting", 0, "Starting firmware update: " + filename);
         
         // Perform the update
-        performOTAUpdate(firmwareUrl, filename);
+        performOTAUpdate(firmwareUrl, filename, firmwareVersion);
       } else {
-        Serial.println("✅ No firmware updates available");
+        String message = responseDoc["message"];
+        Serial.println("✅ " + message);
+        
+        // Check if we have version info
+        if (responseDoc.containsKey("current_version") && responseDoc.containsKey("latest_version")) {
+          String currentVer = responseDoc["current_version"];
+          String latestVer = responseDoc["latest_version"];
+          Serial.println("Current: " + currentVer + ", Latest: " + latestVer);
+        }
       }
     } else {
       Serial.println("❌ Failed to parse OTA response");
@@ -239,8 +287,9 @@ void checkForOTAUpdates() {
 }
 
 // Perform the actual OTA update
-void performOTAUpdate(String firmwareUrl, String filename) {
+void performOTAUpdate(String firmwareUrl, String filename, String newVersion) {
   Serial.println("📥 Starting OTA download from: " + firmwareUrl);
+  Serial.println("Updating from version " + current_firmware_version + " to " + newVersion);
   
   // Report download start
   reportOTAStatus("downloading", 0, "Downloading firmware from cloud storage");
@@ -272,8 +321,13 @@ void performOTAUpdate(String firmwareUrl, String filename) {
       break;
       
     case HTTP_UPDATE_OK:
-      Serial.println("✅ UPDATE SUCCESSFUL - RESTARTING!");
-      reportOTAStatus("success", 100, "Update completed successfully, restarting device");
+      Serial.println("✅ UPDATE SUCCESSFUL!");
+      
+      // Save the new firmware version before restart
+      saveFirmwareVersion(newVersion);
+      
+      reportOTAStatus("complete", 100, "Update completed successfully, restarting device");
+      Serial.println("Firmware version updated to: " + newVersion);
       delay(1000); // Device will restart automatically
       break;
   }
@@ -456,6 +510,32 @@ void checkDeviceRegistration() {
   http.end();
 }
 
+// Report OTA status back to Supabase
+void reportOTAStatus(String status, int progress, String message) {
+  HTTPClient http;
+  String statusUrl = String(supabase_url) + "/functions/v1/esp32-ota-status";
+  
+  http.begin(statusUrl);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("apikey", supabase_key);
+  http.addHeader("Authorization", String("Bearer ") + supabase_key);
+
+  DynamicJsonDocument statusDoc(512);
+  statusDoc["device_id"] = device_id;
+  statusDoc["status"] = status;
+  statusDoc["progress"] = progress;
+  statusDoc["message"] = message;
+  statusDoc["timestamp"] = getCurrentTimestamp();
+
+  String statusBody;
+  serializeJson(statusDoc, statusBody);
+  
+  int httpCode = http.POST(statusBody);
+  Serial.printf("📊 OTA Status reported: %s (%d%%) -> HTTP %d\\n", status.c_str(), progress, httpCode);
+  
+  http.end();
+}
+
 void saveEnergyToEEPROM() {
   for (int i = 0; i < channelCount; i++) {
     int addr = ENERGY_START_ADDR + i * sizeof(float);
@@ -505,7 +585,7 @@ void blinkError() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Code className="w-5 h-5 text-orange-600" />
-            Energy Monitor {channelCount}-Channel Code (Supabase OTA)
+            Energy Monitor {channelCount}-Channel Code (Version-Aware OTA)
           </CardTitle>
           <Button
             variant="outline"
@@ -525,50 +605,53 @@ void blinkError() {
         
         <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
           <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
-            ✅ Fixed Compilation Issues:
+            ✅ Firmware Version Tracking Implemented:
           </p>
           <ul className="text-xs text-green-700 dark:text-green-300 space-y-1 list-disc list-inside">
-            <li>Replaced WiFi.getTime() with getCurrentTimestamp() function</li>
-            <li>Added time.h include for timestamp functionality</li>
-            <li>Uses millis() for simple timestamp generation</li>
-            <li>All WiFi class member calls are now valid</li>
+            <li>ESP32 stores current firmware version in EEPROM</li>
+            <li>Version sent with each OTA check request</li>
+            <li>Server compares versions before offering updates</li>
+            <li>Prevents downloading the same firmware repeatedly</li>
+            <li>Version extracted from filename timestamp</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-            🔧 How Supabase OTA Works:
+            🔧 How Version Control Works:
           </p>
           <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
-            <li>Device checks /functions/v1/esp32-ota-check endpoint every 3 minutes</li>
-            <li>Dashboard uploads firmware to Supabase storage bucket</li>
-            <li>Device downloads firmware via HTTPS when update available</li>
-            <li>Progress is reported back to /functions/v1/esp32-ota-status</li>
-            <li>Device installs firmware and restarts automatically</li>
+            <li>Firmware files named with timestamp prefix (e.g., 1749471895496_firmware.bin)</li>
+            <li>ESP32 extracts version from filename and stores in EEPROM</li>
+            <li>Each OTA check includes current version in request</li>
+            <li>Server only offers update if versions don't match</li>
+            <li>After successful update, new version is saved automatically</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
           <p className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
-            📋 Key Fixes Applied:
+            📋 Key Changes Made:
           </p>
           <ul className="text-xs text-orange-700 dark:text-orange-300 space-y-1 list-disc list-inside">
-            <li>Created getCurrentTimestamp() function using millis()</li>
-            <li>Removed invalid WiFi.getTime() call</li>
-            <li>Added time.h include for future NTP support</li>
-            <li>Maintained all OTA functionality with proper error handling</li>
+            <li>Added firmware version storage in EEPROM at address 400</li>
+            <li>Enhanced OTA check endpoint to accept current_firmware_version</li>
+            <li>Version comparison logic in esp32-ota-check function</li>
+            <li>Automatic version saving after successful OTA update</li>
+            <li>Enhanced logging for version tracking and debugging</li>
           </ul>
         </div>
 
         <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
           <p className="text-sm font-medium text-purple-800 dark:text-purple-200 mb-2">
-            🚀 Required Backend Functions:
+            🚀 Benefits:
           </p>
           <ul className="text-xs text-purple-700 dark:text-purple-300 space-y-1 list-disc list-inside">
-            <li>esp32-ota-check: Returns firmware URL if update available</li>
-            <li>esp32-ota-status: Receives progress and status updates</li>
-            <li>Supabase storage bucket: firmware-updates</li>
-            <li>Database table: device_assignments (existing)</li>
+            <li>Eliminates redundant firmware downloads</li>
+            <li>Reduces bandwidth usage and server load</li>
+            <li>Prevents unnecessary device restarts</li>
+            <li>Clear version tracking in logs</li>
+            <li>Automatic version persistence across reboots</li>
           </ul>
         </div>
       </CardContent>
