@@ -59,27 +59,27 @@ const Dashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-200 dark:from-gray-900 dark:to-gray-800">
+      <div className="min-h-screen flex items-center justify-center gradient-bg">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Loading EnergyTracker...</p>
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground text-shadow">Loading EnergyTracker...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-200 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen gradient-bg">
       {/* Header */}
-      <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
+      <header className="header-glass sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500 rounded-lg">
-                <Zap className="w-6 h-6 text-white" />
+              <div className="icon-container p-2 bg-gradient-to-br from-primary to-accent">
+                <Zap className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">EnergyTracker</h1>
+                <h1 className="text-2xl font-bold text-foreground text-shadow">EnergyTracker</h1>
                 <p className="text-muted-foreground">
                   {selectedDevice ? `Device: ${selectedDevice.custom_name || selectedDevice.device_name}` : 'Multi-Channel Systems'}
                 </p>
@@ -88,14 +88,14 @@ const Dashboard = () => {
 
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="font-medium text-foreground">Welcome, {firstName}</p>
+                <p className="font-medium text-foreground text-shadow">Welcome, {firstName}</p>
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
               </div>
               <ThemeToggle />
               <Button 
                 variant="outline" 
                 onClick={logout}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 shadow-3d hover:shadow-3d-hover transition-all duration-300"
               >
                 <LogOut className="w-4 h-4" />
                 Logout
@@ -108,43 +108,43 @@ const Dashboard = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="energy-card">
+          <Card className="stats-card">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                  <Smartphone className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <div className="icon-container p-3 bg-gradient-to-br from-blue-500 to-blue-600">
+                  <Smartphone className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">My Devices</p>
-                  <p className="text-2xl font-bold text-foreground">{totalDevices}</p>
+                  <p className="text-2xl font-bold text-foreground text-shadow">{totalDevices}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="energy-card">
+          <Card className="stats-card">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                  <Activity className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <div className="icon-container p-3 bg-gradient-to-br from-green-500 to-green-600">
+                  <Activity className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Devices Online</p>
-                  <p className="text-2xl font-bold text-green-800 dark:text-green-200">{onlineDevicesCount}</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400 text-shadow">{onlineDevicesCount}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="energy-card">
+          <Card className="stats-card">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                  <Zap className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <div className="icon-container p-3 bg-gradient-to-br from-purple-500 to-purple-600">
+                  <Zap className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Current Consumption</p>
-                  <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">{totalCurrent.toFixed(2)} A</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 text-shadow">{totalCurrent.toFixed(2)} A</p>
                 </div>
               </div>
             </CardContent>
