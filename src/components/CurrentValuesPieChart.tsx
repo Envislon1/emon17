@@ -146,58 +146,24 @@ const CurrentValuesPieChart = () => {
       <CardContent className="p-6">
         {filteredData.length > 0 ? (
           <div className="space-y-2">
-            <div className="w-full h-64 animate-fade-in" style={{ perspective: '1000px' }}>
+            <div className="w-full h-64 animate-fade-in">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <defs>
                     {filteredData.map((entry, index) => (
-                      <React.Fragment key={entry.gradientId}>
-                        <linearGradient
-                          id={entry.gradientId}
-                          x1="0%"
-                          y1="0%"
-                          x2="100%"
-                          y2="100%"
-                        >
-                          <stop offset="0%" stopColor={entry.color} stopOpacity={1}/>
-                          <stop offset="50%" stopColor={entry.color} stopOpacity={0.8}/>
-                          <stop offset="100%" stopColor={entry.color} stopOpacity={0.6}/>
-                        </linearGradient>
-                        {/* 3D Shadow gradient */}
-                        <linearGradient
-                          id={`${entry.gradientId}-shadow`}
-                          x1="0%"
-                          y1="0%"
-                          x2="100%"
-                          y2="100%"
-                        >
-                          <stop offset="0%" stopColor="#000000" stopOpacity={0.3}/>
-                          <stop offset="100%" stopColor="#000000" stopOpacity={0.1}/>
-                        </linearGradient>
-                      </React.Fragment>
+                      <linearGradient
+                        key={entry.gradientId}
+                        id={entry.gradientId}
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="100%"
+                      >
+                        <stop offset="0%" stopColor={entry.color} stopOpacity={0.9}/>
+                        <stop offset="100%" stopColor={entry.color} stopOpacity={0.7}/>
+                      </linearGradient>
                     ))}
                   </defs>
-                  {/* Shadow pie for 3D effect */}
-                  <Pie
-                    data={filteredData}
-                    cx="50%"
-                    cy="52%"
-                    outerRadius={88}
-                    innerRadius={43}
-                    paddingAngle={3}
-                    dataKey="displayValue"
-                    startAngle={90}
-                    endAngle={450}
-                  >
-                    {filteredData.map((entry, index) => (
-                      <Cell 
-                        key={`shadow-${index}`} 
-                        fill={`url(#${entry.gradientId}-shadow)`}
-                        stroke="none"
-                      />
-                    ))}
-                  </Pie>
-                  {/* Main pie chart */}
                   <Pie
                     data={filteredData}
                     cx="50%"
@@ -209,21 +175,17 @@ const CurrentValuesPieChart = () => {
                     animationBegin={0}
                     animationDuration={800}
                     animationEasing="ease-out"
-                    startAngle={90}
-                    endAngle={450}
                   >
                     {filteredData.map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
                         fill={`url(#${entry.gradientId})`}
-                        stroke={entry.isOnline ? "rgba(255,255,255,0.9)" : '#9ca3af'}
-                        strokeWidth={entry.isOnline ? 3 : 2}
+                        stroke={entry.isOnline ? "rgba(255,255,255,0.8)" : '#9ca3af'}
+                        strokeWidth={entry.isOnline ? 2 : 1}
                         strokeDasharray={entry.isOnline ? '0' : '4,2'}
                         style={{
-                          filter: entry.isOnline ? 'drop-shadow(0 6px 12px rgba(0,0,0,0.15))' : 'opacity(0.7)',
-                          transition: 'all 0.3s ease',
-                          transformOrigin: 'center center',
-                          transform: 'rotateX(-5deg) rotateY(5deg)'
+                          filter: entry.isOnline ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))' : 'opacity(0.6)',
+                          transition: 'all 0.3s ease'
                         }}
                       />
                     ))}
