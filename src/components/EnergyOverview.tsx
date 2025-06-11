@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useEnergy } from '@/contexts/EnergyContext';
 import { Activity } from 'lucide-react';
 
@@ -58,11 +58,10 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
       
       return {
         name: channel.custom_name || `House${channelNumber}`,
-        value: Number((channelEnergy / 1000).toFixed(2)), // Convert Wh to kWh for bar chart
+        value: Number((channelEnergy / 1000).toFixed(2)), // Convert Wh to kWh for line chart
         current: Number(currentValue.toFixed(2)), // Current for reference
         cost: Number(channelCost.toFixed(2)),
         color: GRADIENT_COLORS[colorIndex],
-        gradientId: `gradient-${channelNumber}`,
         isOnline: isChannelOnline,
         deviceId: selectedDeviceId,
         channelNumber: channelNumber
@@ -70,8 +69,8 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
     });
   })() : [];
 
-  // Filter data for bar chart - only show non-zero energy values
-  const barChartData = chartData.filter(item => item.value > 0);
+  // Filter data for line chart - only show non-zero energy values
+  const lineChartData = chartData.filter(item => item.value > 0);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -137,22 +136,22 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
       <CardContent>
         <div>
           <h3 className="text-lg font-semibold mb-4 text-foreground">Energy Consumption (kWh)</h3>
-          {barChartData.length > 0 ? (
+          {lineChartData.length > 0 ? (
             <div className="w-full h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={lineChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <defs>
-                    {barChartData.map((entry, index) => (
+                    {lineChartData.map((entry, index) => (
                       <linearGradient
-                        key={entry.gradientId}
-                        id={entry.gradientId}
+                        key={`gradient-${index}`}
+                        id={`lineGradient-${index}`}
                         x1="0"
                         y1="0"
                         x2="0"
                         y2="1"
                       >
                         <stop offset="5%" stopColor={entry.color} stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor={entry.color} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={entry.color} stopOpacity={0.1}/>
                       </linearGradient>
                     ))}
                   </defs>
@@ -166,18 +165,19 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
                   />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                    {barChartData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={`url(#${entry.gradientId})`}
-                        stroke={entry.isOnline ? entry.color : '#9ca3af'}
-                        strokeWidth={entry.isOnline ? 1 : 2}
-                        strokeDasharray={entry.isOnline ? '0' : '5,5'}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
+                  {lineChartData.map((entry, index) => (
+                    <Line
+                      key={`line-${index}`}
+                      type="monotone"
+                      dataKey="value"
+                      stroke={entry.color}
+                      strokeWidth={3}
+                      dot={{ fill: entry.color, strokeWidth: 2, r: 6 }}
+                      activeDot={{ r: 8, stroke: entry.color, strokeWidth: 2 }}
+                      strokeDasharray={entry.isOnline ? '0' : '5,5'}
+                    />
+                  ))}
+                </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
