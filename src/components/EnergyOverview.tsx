@@ -104,19 +104,19 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
 
   if (!selectedDevice) {
     return (
-      <Card className="energy-card h-[500px]">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-energy-600 dark:text-energy-400" />
+      <Card className="energy-card h-[400px] sm:h-[500px]">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-energy-600 dark:text-energy-400" />
             Energy Consumption Overview
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full h-80 flex items-center justify-center">
+          <div className="w-full h-60 sm:h-80 flex items-center justify-center">
             <div className="text-center">
-              <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No device selected</p>
-              <p className="text-sm text-muted-foreground mt-2">
+              <Activity className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground text-sm sm:text-base">No device selected</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-2">
                 Please add a device or select one from the device manager
               </p>
             </div>
@@ -127,20 +127,22 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
   }
 
   return (
-    <Card className="energy-card h-[500px]">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="w-5 h-5 text-energy-600 dark:text-energy-400" />
-          Energy Consumption Overview - {selectedDevice.custom_name || selectedDevice.device_name}
+    <Card className="energy-card h-[400px] sm:h-[500px]">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-energy-600 dark:text-energy-400" />
+          <span className="truncate">
+            Energy Overview - {selectedDevice.custom_name || selectedDevice.device_name}
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div>
-          <h3 className="text-lg font-semibold mb-4 text-foreground">Energy Consumption (kWh)</h3>
+          <h3 className="text-sm sm:text-lg font-semibold mb-4 text-foreground">Energy Consumption (kWh)</h3>
           {barChartData.length > 0 ? (
-            <div className="w-full h-80">
+            <div className="w-full h-60 sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <BarChart data={barChartData} margin={{ top: 20, right: 10, left: 10, bottom: 60 }}>
                   <defs>
                     {barChartData.map((entry, index) => (
                       <linearGradient
@@ -159,12 +161,13 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="name" 
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 10 }}
                     angle={-45}
                     textAnchor="end"
                     height={80}
+                    interval={0}
                   />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                     {barChartData.map((entry, index) => (
@@ -181,10 +184,10 @@ const EnergyOverview: React.FC<EnergyOverviewProps> = ({ activeDevices }) => {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="w-full h-80 flex items-center justify-center">
+            <div className="w-full h-60 sm:h-80 flex items-center justify-center">
               <div className="text-center">
-                <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No energy data available</p>
+                <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs sm:text-sm text-muted-foreground">No energy data available</p>
               </div>
             </div>
           )}
